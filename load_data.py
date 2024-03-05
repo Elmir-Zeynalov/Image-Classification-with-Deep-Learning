@@ -138,6 +138,8 @@ def train(model, optimizer, criterion, num_epochs, data_loader):
         print(f'Epoch {epoch+1}/{num_epochs}, Loss: {loss.item()}')
 
 def validate(model, criterion, num_epochs, data_loader):
+    correct = 0
+    total_samples = 0
     print("---Validating---")
     model.eval()
     with torch.no_grad():
@@ -151,7 +153,17 @@ def validate(model, criterion, num_epochs, data_loader):
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
 
+                #predicted_label  = outputs.max(1, keepdim=True)[1][:,0]
+                #correct += predicted_label.eq(labels).cpu().sum().numpy()
+                predicted_label = outputs.argmax(dim=1)
+                correct += (predicted_label == labels).sum().item()
+                total_samples += labels.size(0)
+
             print(f'Epoch {epoch+1}/{num_epochs}, Loss: {loss.item()}')
+    #accuracy = correct / len(data_loader.dataset)
+    accuracy = correct / total_samples
+    print(f'Validation Accuracy: {accuracy * 100:.2f}%')
+    return accuracy
 
 
 def train_resnet18_model(device, train_loader, val_loader):

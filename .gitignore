@@ -1,1 +1,7 @@
+#ignoring the different data sets
+test_set.txt
+train_set.txt
+validation_set.txt
+
+#Ignoring the images Data
 Images/

@@ -138,23 +138,7 @@ def train(model, optimizer, criterion, num_epochs, data_loader):
         print(f'Epoch {epoch+1}/{num_epochs}, Loss: {loss.item()}')
 
 
-
-if __name__ == "__main__":
-    root_path = "Images/mandatory1_data/"
-    #dataset = DataSplitter(root_path)
-    #print("Done creating train, validation and test sets...")
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    dataset = ImageDataset(root_path, transform = transform)
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=False, num_workers=1)
-
-
+def train_resnet18_model(device, train_loader):
     model = models.resnet18(pretrained=True)
     num_classes = len(dataset.class_to_idx)
     model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
@@ -166,3 +150,25 @@ if __name__ == "__main__":
     num_epochs = 10
 
     train(model, optimizer, criterion, num_epochs, train_loader)
+
+
+if __name__ == "__main__":
+    root_path = "Images/mandatory1_data/"
+
+    #split data into training, validation and test data sets
+    dataset = DataSplitter(root_path)
+    print("Done creating train, validation and test sets...")
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+
+    # Training dataset and dataloader
+    dataset = ImageDataset(root_path, transform = transform)
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=False, num_workers=1)
+
+    #training with training set
+    train_resnet18_model(device, train_loader)

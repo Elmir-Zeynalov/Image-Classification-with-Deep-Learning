@@ -19,7 +19,8 @@ class ImageDataset(data.Dataset):
         self.labels = []
         self.transform = transform
 
-        with open(self.training_file, 'r') as file:
+
+        with open(self.training_file if self.train else self.validation_file, 'r') as file:
             for line in file:
                 parts = line.split(" ")
                 self.image_filenames.append(parts[0])
@@ -137,10 +138,26 @@ def train(model, optimizer, criterion, num_epochs, data_loader):
             optimizer.step()
         print(f'Epoch {epoch+1}/{num_epochs}, Loss: {loss.item()}')
 
+def validate(model, criterion, num_epochs, data_loader):
+    print("---Validating---")
+    model.eval()
+    with torch.no_grad():
+        for epoch in range(num_epochs):
+            for batch in data_loader:
+                inputs = batch['image']
+                labels = batch['label']
 
-def train_resnet18_model(device, train_loader):
+                
+                inputs, labels = inputs.to(device), labels.to(device)
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+
+            print(f'Epoch {epoch+1}/{num_epochs}, Loss: {loss.item()}')
+
+
+def train_resnet18_model(device, train_loader, val_loader):
     model = models.resnet18(pretrained=True)
-    num_classes = len(dataset.class_to_idx)
+    num_classes = 6 #len(dataset.class_to_idx)
     model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
     
     model = model.to(device)  # Move the model to GPU or CPU
@@ -150,6 +167,20 @@ def train_resnet18_model(device, train_loader):
     num_epochs = 10
 
     train(model, optimizer, criterion, num_epochs, train_loader)
+    print()
+    validate(model, criterion, num_epochs, val_loader)
+
+
+def create_datasets_and_loaders(root_path, transform=None):
+    # Training dataset and dataloader
+    train_dataset = ImageDataset(root_dir=root_path, train=True, transform = transform)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
+
+    # Validation dataset and dataloader
+    val_dataset = ImageDataset(root_dir=root_path, train=False, transform = transform)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=32, shuffle=True, num_workers=4)
+
+    return train_loader, val_loader
 
 
 if __name__ == "__main__":
@@ -166,9 +197,8 @@ if __name__ == "__main__":
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
-    # Training dataset and dataloader
-    dataset = ImageDataset(root_path, transform = transform)
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=False, num_workers=1)
+    #data sets and loaders
+    train_loader, val_loader = create_datasets_and_loaders(root_path=root_path, transform=transform)
 
-    #training with training set
-    train_resnet18_model(device, train_loader)
+    #training and validation
+    train_resnet18_model(device, train_loader, val_loader)

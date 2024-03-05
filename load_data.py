@@ -19,7 +19,6 @@ class ImageDataset(data.Dataset):
         self.labels = []
         self.transform = transform
 
-
         with open(self.training_file if self.train else self.validation_file, 'r') as file:
             for line in file:
                 parts = line.split(" ")

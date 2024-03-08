@@ -149,7 +149,6 @@ def run_epoch_train(model, criterion, optimizer, epoch, data_loader):
         correct          += predicted_label.eq(labels).cpu().sum().numpy()
         confusion_matrix += metrics.confusion_matrix(labels.cpu().numpy(), predicted_label.cpu().numpy(), labels=labels_list)
 
-        
         #print(f'Epoch={epoch} | {(idx+1)/len(data_loader)*100:.2f}% | loss = {loss:.5f}')
 
     loss_avg         = total_loss / len(data_loader)
@@ -159,21 +158,6 @@ def run_epoch_train(model, criterion, optimizer, epoch, data_loader):
     return loss_avg, accuracy, confusion_matrix
 
 def train(model, optimizer, criterion, num_epochs, data_loader):
-#    print("---Training---")
-#    model.train()
-#    for epoch in range(num_epochs):
-#        for batch in data_loader:
-#            inputs = batch['image']
-#            labels = batch['label']
-#
-#            optimizer.zero_grad()
-#
-#            inputs, labels = inputs.to(device), labels.to(device)
-#            outputs = model(inputs)
-#            loss = criterion(outputs, labels)
-#            loss.backward()
-#            optimizer.step()
-#        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {loss.item()}')
     correct = 0
     total_samples = 0
     confusion_matrix = np.zeros(shape=(6,6))
@@ -219,24 +203,27 @@ def train(model, optimizer, criterion, num_epochs, data_loader):
 
 
 
-def run_epoch_eval(model, criterion, epoch, data_loader):
-    model.eval()
 
+def run_epoch_val(model, criterion, epoch, data_loader):
+    model.eval()
     total_loss       = 0 
     correct          = 0 
     confusion_matrix = np.zeros(shape=(6,6))
     labels_list      = [0,1,2,3,4,5]
-
+    criterion = torch.nn.CrossEntropyLoss()
     for idx, batch in enumerate(data_loader):
         images = batch['image'].to('cuda') # send data to GPU
         labels = batch['label'].to('cuda') # send data to GPU
         
         with torch.no_grad():
             prediction = model(images)
-            loss        = criterion(prediction, labels)
+            loss = criterion(prediction, labels)
             loss_numpy = loss.detach().cpu().numpy()
             total_loss += loss_numpy
-            
+            #print(loss)
+            #print(loss_numpy)
+            #print("total:", total_loss)
+
         # Update the number of correct classifications and the confusion matrix
         predicted_label  = prediction.max(1, keepdim=True)[1][:,0]
         correct          += predicted_label.eq(labels).cpu().sum().numpy()
@@ -245,8 +232,87 @@ def run_epoch_eval(model, criterion, epoch, data_loader):
     loss_avg         = total_loss / len(data_loader)
     accuracy         = correct / len(data_loader.dataset)
     confusion_matrix = confusion_matrix / len(data_loader.dataset)
-    print("LOSS_AVG:", loss_avg)
+
     return loss_avg, accuracy, confusion_matrix
+
+
+#def run_epoch_eval(model, criterion, epoch, data_loader):
+#    model.eval()
+#
+#    total_loss       = 0 
+#    correct          = 0 
+#    confusion_matrix = np.zeros(shape=(6,6))
+#    labels_list      = [0,1,2,3,4,5]
+#
+#    for idx, batch in enumerate(data_loader):
+#        images = batch['image'].to('cuda') # send data to GPU
+#        labels = batch['label'].to('cuda') # send data to GPU
+#        
+#        with torch.no_grad():
+#            prediction = model(images)
+#            loss        = criterion(prediction, labels)
+#            loss_numpy = loss.detach().cpu().numpy()
+#            total_loss += loss_numpy
+#            
+#        # Update the number of correct classifications and the confusion matrix
+#        predicted_label  = prediction.max(1, keepdim=True)[1][:,0]
+#        correct          += predicted_label.eq(labels).cpu().sum().numpy()
+#        confusion_matrix += metrics.confusion_matrix(labels.cpu().numpy(), predicted_label.cpu().numpy(), labels=labels_list)
+#
+#    loss_avg         = total_loss / len(data_loader)
+#    accuracy         = correct / len(data_loader.dataset)
+#    confusion_matrix = confusion_matrix / len(data_loader.dataset)
+#    print("LOSS_AVG:", loss_avg)
+#    return loss_avg, accuracy, confusion_matrix
+
+
+#def validate(model, criterion, num_epochs, data_loader):
+#    correct = 0
+#    total_samples = 0
+#    confusion_matrix = np.zeros(shape=(6,6))
+#    labels_list= [0,1,2,3,4,5]
+#    config = {'epochs': num_epochs}
+#
+#    val_loss   = np.zeros(shape=config['epochs'])
+#    val_acc    = np.zeros(shape=config['epochs'])
+#    val_confusion_matrix   = np.zeros(shape=(6,6,config['epochs']))
+#
+#    print("---Validating---")
+#    for epoch in range(num_epochs):
+#        #print("epooooo")
+#        val_loss[epoch], val_acc[epoch], val_confusion_matrix[:,:,epoch]     = \
+#                            run_epoch_eval(model, criterion,  epoch, data_loader)
+#        #print("")
+#    
+#    print("Validation losses")
+#    print(val_loss)
+#
+#    print("********")
+#    ind = np.argmax(val_acc)
+#    class_accuracy = val_confusion_matrix[:,:,ind]
+#    classes = [0,1,2,3,4,5]
+#
+#    accuracy_per_class = []
+#    precision_per_class = []
+#
+#    for ii in range(len(classes)):
+#        true_positives = val_confusion_matrix[ii, ii, ind]
+#        false_positives = np.sum(val_confusion_matrix[:, ii, ind]) - true_positives
+#        precision = true_positives / (true_positives + false_positives)
+#        precision_per_class.append(precision)
+#
+#        acc = val_confusion_matrix[ii,ii,ind] / np.sum(val_confusion_matrix[ii,:,ind])
+#        accuracy_per_class.append(acc)
+#
+#        print(f'Class {str(classes[ii]).ljust(5)}: Accuracy={acc*100:.01f}%, Precision={precision*100:.01f}%')
+#    
+#    average_accuracy = np.mean(accuracy_per_class)
+#    average_precision = np.mean(precision_per_class)
+#    print("****Averages****")
+#    print(f'Average Accuracy: {average_accuracy*100:.01f}%')
+#    print(f'Average Precision: {average_precision*100:.01f}%')
+#    return val_loss
+
 
 
 def validate(model, criterion, num_epochs, data_loader):
@@ -256,19 +322,16 @@ def validate(model, criterion, num_epochs, data_loader):
     labels_list= [0,1,2,3,4,5]
     config = {'epochs': num_epochs}
 
-
     val_loss   = np.zeros(shape=config['epochs'])
     val_acc    = np.zeros(shape=config['epochs'])
     val_confusion_matrix   = np.zeros(shape=(6,6,config['epochs']))
-
-
-    print("---Validating---")
+    print("---Validation---")
     
     for epoch in range(num_epochs):
-        #print("epooooo")
+        print(epoch)
         val_loss[epoch], val_acc[epoch], val_confusion_matrix[:,:,epoch]     = \
-                            run_epoch_eval(model, criterion,  epoch, data_loader)
-        #print("")
+                            run_epoch_val(model, criterion, epoch, data_loader)
+        print()
     
     print("Validation losses")
     print(val_loss)
@@ -313,26 +376,132 @@ def plot_losses(val_loss, train_loss, save_path):
     plt.savefig(save_path)  
     plt.close()
 
-    
 
-def train_resnet18_model(device, train_loader, val_loader):
+
+def run_epoch(model, epoch, data_loader, optimizer, loss_fn, is_training):
+    if is_training==True: 
+        model.train()
+    else:
+        model.eval()
+
+    total_loss       = 0 
+    correct          = 0 
+    confusion_matrix = np.zeros(shape=(6,6))
+    labels_list      = [0,1,2,3,4,5]
+
+    for batch_idx, data_batch in enumerate(data_loader):
+        images = data_batch['image'].to('cuda') # send data to GPU
+        labels = data_batch['label'].to('cuda') # send data to GPU
+
+        if not is_training:
+            with torch.no_grad():
+                prediction = model(images)
+                loss        = loss_fn(prediction, labels)
+                total_loss += loss.item()
+                print("EPOCH:", epoch , "batchid:", batch_idx, "loss:", loss)    
+            
+        elif is_training:
+            prediction = model(images)
+            loss        = loss_fn(prediction, labels)
+            total_loss += loss.item()
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        # Update the number of correct classifications and the confusion matrix
+        predicted_label  = prediction.max(1, keepdim=True)[1][:,0]
+        correct          += predicted_label.eq(labels).cpu().sum().numpy()
+        confusion_matrix += metrics.confusion_matrix(labels.cpu().numpy(), predicted_label.cpu().numpy(), labels=labels_list)
+
+        # Print statistics
+        #batchSize = len(labels)
+        
+        #print(f'Epoch={epoch} | loss = {loss:.5f}')
+
+    loss_avg         = total_loss / len(data_loader)
+    accuracy         = correct / len(data_loader.dataset)
+    confusion_matrix = confusion_matrix / len(data_loader.dataset)
+
+    return loss_avg, accuracy, confusion_matrix
+
+
+def run_the_training(model, epochs, optimizer, criterion, train_loader, val_loader):
+    train_loss = np.zeros(shape=epochs)
+    train_acc  = np.zeros(shape=epochs)
+    val_loss   = np.zeros(shape=epochs)
+    val_acc    = np.zeros(shape=epochs)
+    train_confusion_matrix = np.zeros(shape=(6,6,epochs))
+    val_confusion_matrix   = np.zeros(shape=(6,6,epochs))
+
+    for epoch in range(epochs):
+        train_loss[epoch], train_acc[epoch], train_confusion_matrix[:,:,epoch] = \
+                                run_epoch(model, epoch, train_loader, optimizer, criterion, is_training=True)
+
+        val_loss[epoch], val_acc[epoch], val_confusion_matrix[:,:,epoch]     = \
+                                run_epoch(model, epoch, val_loader, optimizer,criterion,  is_training=False)
+    
+    return train_loss, train_acc, train_confusion_matrix, val_loss, val_acc, val_confusion_matrix 
+
+def plot_me(train_loss, train_acc, val_loss,val_acc, save_path):
+    plt.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
+    ax = plt.subplot(2, 1, 1)
+    # plt.subplots_adjust(hspace=2)
+    ax.plot(train_loss, 'b', label='train loss')
+    ax.plot(val_loss, 'r', label='validation loss')
+    ax.grid()
+    plt.ylabel('Loss', fontsize=18)
+    plt.xlabel('Epochs', fontsize=18)
+    ax.legend(loc='upper right', fontsize=16)
+
+    ax = plt.subplot(2, 1, 2)
+    plt.subplots_adjust(hspace=0.4)
+    ax.plot(train_acc, 'b', label='train accuracy')
+    ax.plot(val_acc, 'r', label='validation accuracy')
+    ax.grid()
+    plt.ylabel('Accuracy', fontsize=18)
+    plt.xlabel('Epochs', fontsize=18)
+    val_acc_max = np.max(val_acc)
+    val_acc_max_ind = np.argmax(val_acc)
+    plt.axvline(x=val_acc_max_ind, color='g', linestyle='--', label='Highest validation accuracy')
+    plt.title('Highest validation accuracy = %0.1f %%' % (val_acc_max*100), fontsize=16)
+    ax.legend(loc='lower right', fontsize=16)
+
+    plt.savefig(save_path)  
+    plt.close()
+
+def train_resnet18_model(device, num_epochs, train_loader, val_loader):
     torch.manual_seed(42)
     torch.cuda.manual_seed_all(42)
 
-    model = models.resnet18(pretrained=True)
+    model = models.resnet50(pretrained=True)
     num_classes = 6 #len(dataset.class_to_idx)
     model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
+
+    #dropout_prob = 0.2  # You can adjust this probability
+    #model.fc = torch.nn.Sequential(
+    #    torch.nn.Dropout(p=dropout_prob),  # Dropout layer
+    #    torch.nn.Linear(model.fc.in_features, num_classes)
+    #)
     
     model = model.to(device)  # Move the model to GPU or CPU
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    num_epochs = 20
+    #optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.00001, momentum=0.9)
 
-    train_losses = train(model, optimizer, criterion, num_epochs, train_loader)
+
+    train_loss, train_acc, train_confusion_matrix, val_loss, val_acc, val_confusion_matrix = run_the_training(model, num_epochs, optimizer, criterion, train_loader, val_loader)
+    print("Training Losses")
+    print(train_loss)
+    print("------------")
+
     print()
-    val_loss = validate(model, criterion, num_epochs, val_loader)
-    plot_losses(val_loss, train_losses, "validation_loses.png")
+    print("Validation Losses")
+    print(val_loss)
+    print("------------")
+
+    plot_me(train_loss, train_acc,val_loss, val_acc,"Validation_loses.png")
 
 
 def create_datasets_and_loaders(root_path, transform=None, seed=50):
@@ -342,11 +511,11 @@ def create_datasets_and_loaders(root_path, transform=None, seed=50):
     
     # Training dataset and dataloader
     train_dataset = ImageDataset(root_dir=root_path, train=True, transform = transform)
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=False, num_workers=4,worker_init_fn=worker_init_fn)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=2,worker_init_fn=worker_init_fn)
 
     # Validation dataset and dataloader
     val_dataset = ImageDataset(root_dir=root_path, train=False, transform = transform)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4, worker_init_fn=worker_init_fn)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=16, shuffle=False, num_workers=2, worker_init_fn=worker_init_fn)
 
     return train_loader, val_loader
 
@@ -364,47 +533,14 @@ if __name__ == "__main__":
     #    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     #])
 
-    # a bit better
-    #transform = transforms.Compose([
-    #    transforms.Resize((224, 224)),
-    #    transforms.RandomHorizontalFlip(),  # Randomly flip the image horizontally
-    #    transforms.ToTensor(),
-    #    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    #])
-
-    transform=transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.RandomVerticalFlip(),
+    transform = transforms.Compose([
+        transforms.Resize(224),
+        transforms.CenterCrop(224),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
-#
-#
-    #transform = transforms.Compose([
-    #    transforms.Resize((224, 224)),
-    #    transforms.GaussianBlur(kernel_size=3),
-    #    transforms.ToTensor(),
-    #    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    #])
-#
-    #transforms.Compose([
-    #    transforms.Resize((224, 224)),
-    #    transforms.RandomErasing(p=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3)),
-    #    transforms.ToTensor(),
-    #    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    #])
-
-    #trash
-    #transform = transforms.Compose([
-    #    transforms.RandomResizedCrop(224),
-    #    transforms.RandomHorizontalFlip(),
-    #    transforms.RandomRotation(degrees=30),
-    #    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-    #    transforms.ToTensor(),
-    #    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    #])
-
-
+    
+    num_epochs = 30
     seed = 42
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -413,4 +549,4 @@ if __name__ == "__main__":
     train_loader, val_loader = create_datasets_and_loaders(root_path=root_path, transform=transform, seed=seed)
 
     #training and validation
-    train_resnet18_model(device, train_loader, val_loader)
+    train_resnet18_model(device, num_epochs, train_loader, val_loader)

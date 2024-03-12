@@ -10,21 +10,32 @@ import torch.nn.functional as F
 from sklearn.metrics import accuracy_score, precision_recall_curve, auc, average_precision_score
 import matplotlib.pyplot as plt
 from utils import create_folder, save_model, load_model
+from feature_map_utils import analyze_feature_maps
+
 
 class ImageDataset(data.Dataset):
-    def __init__(self, root_dir, train=True, transform=None):
+    def __init__(self, root_dir, dataset="train", transform=None):
         self.root_dir = root_dir
         self.transform = transform
         self.training_file = "train_set.txt"
         self.validation_file = "validation_set.txt"
         self.test_file = "test_set.txt"
-        self.train    = train
+        self.dataset    = dataset
         self.class_to_idx = {}
         self.image_filenames = []
         self.labels = []
         self.transform = transform
 
-        with open(self.training_file if self.train else self.validation_file, 'r') as file:
+        if self.dataset == "train":
+            file_path = self.training_file
+        elif self.dataset == "val":
+            file_path = self.validation_file
+        elif self.dataset == "test":
+            file_path = self.test_file
+        else:
+            raise ValueError("Invalid value for 'train' parameter. Use 'train', 'val', or 'test'.")
+
+        with open(file_path, 'r') as file:
             for line in file:
                 parts = line.split(" ")
                 self.image_filenames.append(parts[0])
@@ -355,14 +366,47 @@ def create_datasets_and_loaders(root_path, transform=None, seed=50):
         torch.manual_seed(seed + worker_id)
     
     # Training dataset and dataloader
-    train_dataset = ImageDataset(root_dir=root_path, train=True, transform = transform)
+    train_dataset = ImageDataset(root_dir=root_path, dataset="train", transform = transform)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=2,worker_init_fn=worker_init_fn)
 
     # Validation dataset and dataloader
-    val_dataset = ImageDataset(root_dir=root_path, train=False, transform = transform)
+    val_dataset = ImageDataset(root_dir=root_path, dataset="val", transform = transform)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=16, shuffle=False, num_workers=2, worker_init_fn=worker_init_fn)
 
-    return train_loader, val_loader
+
+    test_dataset = ImageDataset(root_dir=root_path, dataset="test", transform=transform)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=16, shuffle=True, num_workers=2, worker_init_fn=worker_init_fn)
+    
+    return train_loader, val_loader, test_loader
+
+
+def feature_map_statistics(test_dataloader):
+    torch.manual_seed(42)
+    torch.cuda.manual_seed_all(42)
+
+    model = models.resnet50(pretrained=True)
+    num_classes = 6 #len(dataset.class_to_idx)
+    model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
+
+    model = model.to(device)  # Move the model to GPU or CPU
+
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.00001, momentum=0.9)
+    
+    last_epoch = 29
+    curr_dir = os.getcwd()
+    load_path = f'{curr_dir}/SavedModels/model_checkpoint_epoch_{last_epoch}.pth'
+
+    model, optimizer, epoch = load_model(model, optimizer, load_path)
+    #print(f'\033[1mModel load successful!\033[0m')
+    print('\033[92mModel load successful!\033[0m')
+
+    model.eval()
+
+    analyze_feature_maps(model, test_dataloader, device, num_samples=200)
+
+
+
 
 if __name__ == "__main__":
     root_path = "Images/mandatory1_data/"
@@ -372,11 +416,6 @@ if __name__ == "__main__":
     print("Done creating train, validation and test sets...")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #transform = transforms.Compose([
-    #    transforms.Resize((224, 224)),
-    #    transforms.ToTensor(),
-    #    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    #])
 
     transform = transforms.Compose([
         transforms.Resize(224),
@@ -391,7 +430,9 @@ if __name__ == "__main__":
     torch.cuda.manual_seed_all(seed)
 
     #data sets and loaders
-    train_loader, val_loader = create_datasets_and_loaders(root_path=root_path, transform=transform, seed=seed)
-
+    train_loader, val_loader, test_loader = create_datasets_and_loaders(root_path=root_path, transform=transform, seed=seed)
+    print("Dataloaders initialized")
     #training and validation
-    train_resnet18_model(device, num_epochs, train_loader, val_loader)
+    #train_resnet18_model(device, num_epochs, train_loader, val_loader)
+    feature_map_statistics(test_loader)
+

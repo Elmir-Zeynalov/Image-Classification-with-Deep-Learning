@@ -5,3 +5,5 @@ validation_set.txt
 
 #Ignoring the images Data
 Images/
+SavedModels/
+__pycache__/

@@ -9,8 +9,9 @@ from sklearn import metrics
 import torch.nn.functional as F
 from sklearn.metrics import accuracy_score, precision_recall_curve, auc, average_precision_score
 import matplotlib.pyplot as plt
-from utils import create_folder, save_model, load_model
+from utils import create_folder, save_model, load_model, create_resnet50_model, load_presaved_model
 from feature_map_utils import analyze_feature_maps
+from pca_analytics import perform_pca, perform_pca_2
 
 
 class ImageDataset(data.Dataset):
@@ -78,7 +79,9 @@ class ImageDataset(data.Dataset):
         return sample
 
     def convert_label_to_ix(self, label_list):
-        classes = list(set(label_list))
+        #classes = list(set(label_list))
+        #class_to_idx = {class_name: idx for idx, class_name in enumerate(classes)}
+        classes = ['buildings', 'forest', 'glacier', 'mountain', 'sea', 'street']
         class_to_idx = {class_name: idx for idx, class_name in enumerate(classes)}
         return class_to_idx
 
@@ -157,7 +160,7 @@ def run_epoch(model, epoch, data_loader, optimizer, loss_fn, is_training):
                 prediction = model(images)
                 loss        = loss_fn(prediction, labels)
                 total_loss += loss.item()
-                print("EPOCH:", epoch , "batchid:", batch_idx, "loss:", loss)    
+                #print("EPOCH:", epoch , "batchid:", batch_idx, "loss:", loss)    
             
         elif is_training:
             prediction = model(images)
@@ -203,17 +206,18 @@ def run_the_training(model, epochs, optimizer, criterion, train_loader, val_load
     val_true_vals = [[] for _ in range(epochs)]
 
     for epoch in range(epochs):
+        print(f'Epoch = {epoch}')
         train_loss[epoch], train_acc[epoch], train_confusion_matrix[:,:,epoch], train_predicted[epoch], train_true_vals[epoch] = \
                                 run_epoch(model, epoch, train_loader, optimizer, criterion, is_training=True)
 
         val_loss[epoch], val_acc[epoch], val_confusion_matrix[:,:,epoch], val_predicted[epoch], val_true_vals[epoch]     = \
                                 run_epoch(model, epoch, val_loader, optimizer,criterion,  is_training=False)
         
-        # Save the entire model after each epoch
-        save_path = os.path.join(save_folder_path, f'model_checkpoint_epoch_{epoch}.pth')
-        save_model(model, optimizer, epoch, save_path)
+        
+    save_path = os.path.join(save_folder_path, f'model_checkpoint_epoch_{epoch}.pth')
+    save_model(model, save_path)
     
-    return train_loss, train_acc, train_confusion_matrix, train_predicted, train_true_vals, val_loss, val_acc, val_confusion_matrix, val_predicted, val_true_vals
+    return train_loss, train_acc, train_confusion_matrix, train_predicted, train_true_vals, val_loss, val_acc, val_confusion_matrix, val_predicted, val_true_vals, model
 
 def plot_me(train_loss, train_acc, val_loss,val_acc, save_path):
     plt.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
@@ -263,11 +267,11 @@ def calc_accuracy_per_class(confusion_matrix, classes, epoch):
 
     for ii in range(len(classes)):
         acc = confusion_matrix[ii,ii,epoch] / np.sum(confusion_matrix[ii,:,epoch])
-        print(f'Accuracy of {str(classes[ii]).ljust(15)}: {acc*100:.01f}%')
+        #print(f'Accuracy of {str(classes[ii]).ljust(15)}: {acc*100:.01f}%')
         accuracies.append(acc)
     
     average_over_classes = np.mean(accuracies)
-    print("AVG:",average_over_classes)
+    #print("AVG:",average_over_classes)
     return average_over_classes, accuracies 
 
 def accuracies_for_all_epochs(confusion_matrices, classes):
@@ -294,6 +298,7 @@ def calc_average_precision_per_class(y_true, y_pred, classes):
         y_pred_bin = [1 if label == i else 0 for label in y_pred]
     
         precision, recall, _ = precision_recall_curve(y_true_bin, y_pred_bin)
+
         ap_i = average_precision_score(y_true_bin, y_pred_bin)
         average_per_class[i] = ap_i
         average_precision += ap_i
@@ -315,25 +320,14 @@ def average_precisions_mAPs_for_all_epochs(y_true, y_pred, classes):
     
     return mAPs, epoch_precisions
 
-def train_resnet18_model(device, num_epochs, train_loader, val_loader):
+def train_resnet_model(device, num_epochs, train_loader, val_loader, seed):
     # Define ANSI escape code for red color
     RED = '\033[91m'
     # Define ANSI escape code to reset color
     RESET = '\033[0m'
     
-    torch.manual_seed(42)
-    torch.cuda.manual_seed_all(42)
-
-    model = models.resnet50(pretrained=True)
-    num_classes = 6 #len(dataset.class_to_idx)
-    model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
-
-    model = model.to(device)  # Move the model to GPU or CPU
-
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.00001, momentum=0.9)
-
-    train_loss, train_acc, train_confusion_matrix, train_predicted, train_true_vals, val_loss, val_acc, val_confusion_matrix, val_predicted, val_true_vals = run_the_training(model, num_epochs, optimizer, criterion, train_loader, val_loader)
+    model, optimizer, criterion = create_resnet50_model(device, seed)
+    train_loss, train_acc, train_confusion_matrix, train_predicted, train_true_vals, val_loss, val_acc, val_confusion_matrix, val_predicted, val_true_vals, modello = run_the_training(model, num_epochs, optimizer, criterion, train_loader, val_loader)
     print("Training Losses")
     print(train_loss)
     print("------------\n")
@@ -348,7 +342,7 @@ def train_resnet18_model(device, num_epochs, train_loader, val_loader):
     accuracies_averages, accuracies = accuracies_for_all_epochs(val_confusion_matrix, [0,1,2,3,4,5])
     
     print("Accuracies")
-    print(accuracies_averages)
+    #print(accuracies_averages)
     #print(accuracies)
     print(f'{RED}Average over all epochs: {np.mean(accuracies_averages)*100:.01f}%{RESET}')
 
@@ -356,12 +350,12 @@ def train_resnet18_model(device, num_epochs, train_loader, val_loader):
     mAPs, APs = average_precisions_mAPs_for_all_epochs(val_true_vals, val_predicted, [0,1,2,3,4,5])
     print("\nmAps")
     print(mAPs)
-    {print(f'{RED}mAP over all epochs: {np.mean(mAPs)*100:.01f}%{RESET}')}
+    print(f'{RED}mAP over all epochs: {np.mean(mAPs)*100:.01f}%{RESET}')
     plot_precision_and_accuracy(mAPs, accuracies_averages, "mAP_and_average_class_accuracy.png")
+    return modello
 
 
 def create_datasets_and_loaders(root_path, transform=None, seed=50):
-
     def worker_init_fn(worker_id):
         torch.manual_seed(seed + worker_id)
     
@@ -369,43 +363,88 @@ def create_datasets_and_loaders(root_path, transform=None, seed=50):
     train_dataset = ImageDataset(root_dir=root_path, dataset="train", transform = transform)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=2,worker_init_fn=worker_init_fn)
 
+    transform = transforms.Compose([
+        transforms.Resize(224),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
     # Validation dataset and dataloader
     val_dataset = ImageDataset(root_dir=root_path, dataset="val", transform = transform)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=16, shuffle=False, num_workers=2, worker_init_fn=worker_init_fn)
 
-
     test_dataset = ImageDataset(root_dir=root_path, dataset="test", transform=transform)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=16, shuffle=True, num_workers=2, worker_init_fn=worker_init_fn)
     
-    return train_loader, val_loader, test_loader
+    return train_loader, val_loader, test_loader, val_dataset
 
 
-def feature_map_statistics(test_dataloader):
-    torch.manual_seed(42)
-    torch.cuda.manual_seed_all(42)
-
-    model = models.resnet50(pretrained=True)
-    num_classes = 6 #len(dataset.class_to_idx)
-    model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
-
-    model = model.to(device)  # Move the model to GPU or CPU
-
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.00001, momentum=0.9)
-    
-    last_epoch = 29
-    curr_dir = os.getcwd()
-    load_path = f'{curr_dir}/SavedModels/model_checkpoint_epoch_{last_epoch}.pth'
-
-    model, optimizer, epoch = load_model(model, optimizer, load_path)
-    #print(f'\033[1mModel load successful!\033[0m')
-    print('\033[92mModel load successful!\033[0m')
-
-    model.eval()
-
+def feature_map_statistics(test_dataloader, device, epoch, seed):
+    model = load_presaved_model(device, seed, epoch-1)
     analyze_feature_maps(model, test_dataloader, device, num_samples=200)
 
 
+
+def evaluate_trained_model(model, dataloader):
+    total_loss       = 0 
+    correct          = 0 
+    confusion_matrix = np.zeros(shape=(6,6))
+    labels_list      = [0,1,2,3,4,5]
+
+    predicted = []
+    true_values = [] 
+    model.eval()
+
+    for batch_idx, data_batch in enumerate(dataloader):
+        data = data_batch['image'].to(device)
+        target = data_batch['label'].to(device)
+        
+        # Forward pass through the model
+        with torch.no_grad():
+            output = model(data)
+
+        predicted_label  = output.max(1, keepdim=True)[1][:,0]
+        confusion_matrix += metrics.confusion_matrix(target.cpu().numpy(), predicted_label.cpu().numpy(), labels=labels_list)
+        predicted.extend(predicted_label.cpu().numpy())
+        true_values.extend(target.cpu().numpy())
+
+
+    loss_avg         = total_loss / len(dataloader)
+    accuracy         = correct / len(dataloader.dataset)
+    confusion_matrix = confusion_matrix / len(dataloader.dataset)
+
+    return loss_avg, accuracy, confusion_matrix, predicted, true_values
+
+    
+
+def test_model_and_softmaxes(model, dataloader, type, device, num_epochs,seed):
+    # Define ANSI escape code for red color
+    RED = '\033[91m'
+    # Define ANSI escape code to reset color
+    RESET = '\033[0m'
+
+    confusion_matrix = np.zeros(shape=(6,6,1))
+    predicted = [[] for _ in range(1)]
+    true_values = [[] for _ in range(1)]
+
+    print(f'Running {type} set...')
+    #model, criterion, optimizer = load_presaved_model(device, seed, 20)
+    loss_avg, accuracy, confusion_matrix[:,:, 0], predicted[0], true_values[0] = evaluate_trained_model(model, dataloader)
+
+    print(f'***[{type} Evaluation]***')
+    print("Accuracies")
+    accuracies_averages, accuracies = accuracies_for_all_epochs(confusion_matrix, [0,1,2,3,4,5])
+
+    print(accuracies_averages)
+    print(accuracies)
+    print(f'{RED} {type} set Accuracy: {np.mean(accuracies_averages)*100:.01f}%{RESET}')
+
+    #mAP and APs per class for each epoch 
+    mAPs, APs = average_precisions_mAPs_for_all_epochs(true_values, predicted, [0,1,2,3,4,5])
+    #mAPs, APs = average_precisions_mAPs_for_all_epochs(true_values, predicted, calc_average_precision_per_class(true_values, predicted, [0,1,2,3,4,5]))
+    print("\nmAps")
+    print(mAPs)
+    print(f'{RED} {type} set mAP: {np.mean(mAPs)*100:.01f}%{RESET}')
 
 
 if __name__ == "__main__":
@@ -414,25 +453,41 @@ if __name__ == "__main__":
     #split data into training, validation and test data sets
     #dataset = DataSplitter(root_path)
     print("Done creating train, validation and test sets...")
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     transform = transforms.Compose([
-        transforms.Resize(224),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        transforms.RandomResizedCrop(224),  
+        transforms.RandomHorizontalFlip(),  
+        transforms.RandomVerticalFlip(),  # New: Randomly flip the image vertically
+        transforms.RandomRotation(degrees=30),  
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  
+        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.8, 1.2), shear=0.2),  # New: Random affine transformation
+        #transforms.RandomPerspective(),  # New: Random perspective transformation
+        #transforms.RandomErasing(p=0.5, scale=(0.02, 0.2)),  # New: Random erasing
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=3)], p=0.5),  # New: Random Gaussian blur
+        transforms.ToTensor(),  
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  
     ])
     
-    num_epochs = 30 #30
+    num_epochs = 20 #30
     seed = 42
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
     #data sets and loaders
-    train_loader, val_loader, test_loader = create_datasets_and_loaders(root_path=root_path, transform=transform, seed=seed)
+    train_loader, val_loader, test_loader, val_dataset = create_datasets_and_loaders(root_path=root_path, transform=transform, seed=seed)
     print("Dataloaders initialized")
+
     #training and validation
-    #train_resnet18_model(device, num_epochs, train_loader, val_loader)
-    feature_map_statistics(test_loader)
+    #mod = train_resnet_model(device, num_epochs, train_loader, val_loader, seed)
+    print("Training done...")
+
+    #feature_map_statistics(test_loader, device, num_epochs, seed)
+    print("Feature Map statistics...")
+
+    #perform_pca_2(device, seed, num_epochs, val_dataset, "test_pca_epochs.png")
+    print("PCA done")
+
+    modello = load_presaved_model(device, seed, num_epochs-1)
+    test_model_and_softmaxes(modello, test_loader, "TEST", device, num_epochs, seed)
 

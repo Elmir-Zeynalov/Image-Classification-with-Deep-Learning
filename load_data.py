@@ -385,7 +385,7 @@ def feature_map_statistics(test_dataloader, device, epoch, seed):
 
 
 
-def evaluate_trained_model(model, dataloader):
+def evaluate_model_on_testset(model, dataloader):
     total_loss       = 0 
     correct          = 0 
     confusion_matrix = np.zeros(shape=(6,6))
@@ -393,8 +393,8 @@ def evaluate_trained_model(model, dataloader):
 
     predicted = []
     true_values = [] 
-    model.eval()
 
+    model.eval()
     for batch_idx, data_batch in enumerate(dataloader):
         data = data_batch['image'].to(device)
         target = data_batch['label'].to(device)
@@ -408,12 +408,9 @@ def evaluate_trained_model(model, dataloader):
         predicted.extend(predicted_label.cpu().numpy())
         true_values.extend(target.cpu().numpy())
 
-
-    loss_avg         = total_loss / len(dataloader)
-    accuracy         = correct / len(dataloader.dataset)
     confusion_matrix = confusion_matrix / len(dataloader.dataset)
 
-    return loss_avg, accuracy, confusion_matrix, predicted, true_values
+    return confusion_matrix, predicted, true_values
 
     
 
@@ -429,7 +426,7 @@ def test_model_and_softmaxes(model, dataloader, type, device, num_epochs,seed):
 
     print(f'Running {type} set...')
     #model, criterion, optimizer = load_presaved_model(device, seed, 20)
-    loss_avg, accuracy, confusion_matrix[:,:, 0], predicted[0], true_values[0] = evaluate_trained_model(model, dataloader)
+    confusion_matrix[:,:, 0], predicted[0], true_values[0] = evaluate_model_on_testset(model, dataloader)
 
     print(f'***[{type} Evaluation]***')
     print("Accuracies")

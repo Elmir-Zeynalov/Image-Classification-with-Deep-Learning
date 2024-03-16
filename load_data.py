@@ -282,7 +282,6 @@ def accuracies_for_all_epochs(confusion_matrices, classes):
         avg_accuracy, acc = calc_accuracy_per_class(confusion_matrices, classes, epoch)
         averages[epoch] = avg_accuracy
         epoch_accuracies[epoch] = acc 
-        print()
 
     return averages, epoch_accuracies
 
@@ -393,28 +392,53 @@ def evaluate_model_on_testset(model, dataloader):
 
     predicted = []
     true_values = [] 
+    softmax_scores = []
+    image_paths = []
 
     model.eval()
     for batch_idx, data_batch in enumerate(dataloader):
         data = data_batch['image'].to(device)
         target = data_batch['label'].to(device)
+        path = data_batch['filepath']
         
         # Forward pass through the model
         with torch.no_grad():
             output = model(data)
+            softmax_output = F.softmax(output, dim=1)
+            print("Batch id:", batch_idx)
+            print(softmax_output.cpu().numpy())
+            print(path)
+            print()
 
         predicted_label  = output.max(1, keepdim=True)[1][:,0]
         confusion_matrix += metrics.confusion_matrix(target.cpu().numpy(), predicted_label.cpu().numpy(), labels=labels_list)
         predicted.extend(predicted_label.cpu().numpy())
         true_values.extend(target.cpu().numpy())
+        softmax_scores.extend(softmax_output.cpu().numpy())
+        image_paths.extend(path)
 
     confusion_matrix = confusion_matrix / len(dataloader.dataset)
+    #for i in range(len(softmax_scores)):
+        #print(softmax_scores[i])
+    return confusion_matrix, predicted, true_values, softmax_scores
 
-    return confusion_matrix, predicted, true_values
 
-    
 
-def test_model_and_softmaxes(model, dataloader, type, device, num_epochs,seed):
+'''
+Predict on the test set, compute the mAP and mean accuracy per
+class, and save the softmax scores to file. For three classes of your choice, show
+ten images of the worst and ten of the best images according to the softmax
+score. Write code to load the test set, predict on the test set, and then compare
+these against your saved softmax scores. There can be some tolerance between
+the two. Please use relative paths from the main Python files for loading the
+scores, model, etc. Only use an absolute path for the dataset root.
+
+
+'''
+
+
+
+def test_model_and_softmaxes(dataloader, type, device, num_epochs,seed):
     # Define ANSI escape code for red color
     RED = '\033[91m'
     # Define ANSI escape code to reset color
@@ -425,23 +449,24 @@ def test_model_and_softmaxes(model, dataloader, type, device, num_epochs,seed):
     true_values = [[] for _ in range(1)]
 
     print(f'Running {type} set...')
-    #model, criterion, optimizer = load_presaved_model(device, seed, 20)
-    confusion_matrix[:,:, 0], predicted[0], true_values[0] = evaluate_model_on_testset(model, dataloader)
+    model = load_presaved_model(device, seed, num_epochs-1)
+    confusion_matrix[:,:, 0], predicted[0], true_values[0], softmax_scores = evaluate_model_on_testset(model, dataloader)
+    np.save("softmax_scores.npy", np.array(softmax_scores))
 
-    print(f'***[{type} Evaluation]***')
-    print("Accuracies")
     accuracies_averages, accuracies = accuracies_for_all_epochs(confusion_matrix, [0,1,2,3,4,5])
-
-    print(accuracies_averages)
-    print(accuracies)
-    print(f'{RED} {type} set Accuracy: {np.mean(accuracies_averages)*100:.01f}%{RESET}')
-
-    #mAP and APs per class for each epoch 
     mAPs, APs = average_precisions_mAPs_for_all_epochs(true_values, predicted, [0,1,2,3,4,5])
-    #mAPs, APs = average_precisions_mAPs_for_all_epochs(true_values, predicted, calc_average_precision_per_class(true_values, predicted, [0,1,2,3,4,5]))
-    print("\nmAps")
-    print(mAPs)
-    print(f'{RED} {type} set mAP: {np.mean(mAPs)*100:.01f}%{RESET}')
+
+    print(f'\t\t[Evaluation]')
+    print("***********************************************************")
+    print("\t\tClass Accuracies")
+
+    for i, c in enumerate(accuracies[0]):
+        print(f'Accuracy of {str(i).ljust(15)}: {c*100:.01f}%')
+    
+    print(f'-> {RED}Avg Accuracy: {np.mean(accuracies_averages)*100:.01f}%{RESET}')
+    print(f'-> {RED}mAP: {np.mean(mAPs)*100:.01f}%{RESET}')
+    print("***********************************************************")
+
 
 
 if __name__ == "__main__":
@@ -485,6 +510,6 @@ if __name__ == "__main__":
     #perform_pca_2(device, seed, num_epochs, val_dataset, "test_pca_epochs.png")
     print("PCA done")
 
-    modello = load_presaved_model(device, seed, num_epochs-1)
-    test_model_and_softmaxes(modello, test_loader, "TEST", device, num_epochs, seed)
+    
+    test_model_and_softmaxes(test_loader, "TEST", device, num_epochs, seed)
 

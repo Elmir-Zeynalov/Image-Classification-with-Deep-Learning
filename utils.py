@@ -109,14 +109,6 @@ def load_presaved_model(device, seed, epoch):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
-    #model = models.resnet50(pretrained=True)
-    #num_classes = 6
-    #model.fc = NN_models(model, 3)
-    #model = model.to(device)  # Move the model to GPU or CPU
-
-    #criterion = torch.nn.CrossEntropyLoss()
-    #optimizer = torch.optim.SGD(model.parameters(), lr=0.0001, momentum=0.9, weight_decay=0.001)
-    
     last_epoch = epoch # last epoch
     curr_dir = os.getcwd()
     load_path = f'{curr_dir}/SavedModels/model_checkpoint_epoch_{last_epoch}.pth'

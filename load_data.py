@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from utils import create_folder, save_model, load_model, create_resnet50_model, load_presaved_model
 from feature_map_utils import analyze_feature_maps
 from pca_analytics import perform_pca, perform_pca_2
-
+import shutil
 
 class ImageDataset(data.Dataset):
     def __init__(self, root_dir, dataset="train", transform=None):
@@ -382,6 +382,21 @@ def feature_map_statistics(test_dataloader, device, epoch, seed):
     model = load_presaved_model(device, seed, epoch-1)
     analyze_feature_maps(model, test_dataloader, device, num_samples=200)
 
+'''
+This function creates 2 directories, Best_10 and Worst_10
+Under each directory thare are subdirectories representing 3 classes. 
+Images for the best and worst are then copied over to this local directory
+'''
+def copy_images(image_paths, directory_name, classes=['buildings', 'forest', 'glacier']):
+    current_directory = os.getcwd()
+    save_folder_path = os.path.join(current_directory, directory_name)
+    create_folder(save_folder_path)
+
+    for i, paths in enumerate(image_paths):
+        class_path = os.path.join(save_folder_path, classes[i])
+        create_folder(class_path)
+        for img in paths:
+            shutil.copy(img, class_path)
 
 
 def find_best_and_worst_from_softmaxes(softmaxes, image_paths):
@@ -435,16 +450,19 @@ def evaluate_model_on_testset(model, dataloader):
     confusion_matrix = confusion_matrix / len(dataloader.dataset)
     top_10, worst_10 = find_best_and_worst_from_softmaxes(softmax_scores, image_paths)
 
+    copy_images(top_10, 'Best_10')
+    copy_images(worst_10, 'Worst_10')
 
     return confusion_matrix, predicted, true_values, softmax_scores
-
 
 
 '''
 Predict on the test set, compute the mAP and mean accuracy per
 class, and save the softmax scores to file. For three classes of your choice, show
 ten images of the worst and ten of the best images according to the softmax
-score. Write code to load the test set, predict on the test set, and then compare
+score. 
+
+Write code to load the test set, predict on the test set, and then compare
 these against your saved softmax scores. There can be some tolerance between
 the two. Please use relative paths from the main Python files for loading the
 scores, model, etc. Only use an absolute path for the dataset root.
@@ -454,7 +472,7 @@ scores, model, etc. Only use an absolute path for the dataset root.
 
 
 
-def test_model_and_softmaxes(dataloader, type, device, num_epochs,seed):
+def test_model_and_extract_softmaxes(dataloader, type, device, num_epochs,seed):
     # Define ANSI escape code for red color
     RED = '\033[91m'
     # Define ANSI escape code to reset color
@@ -527,5 +545,5 @@ if __name__ == "__main__":
     print("PCA done")
 
     
-    test_model_and_softmaxes(test_loader, "TEST", device, num_epochs, seed)
+    test_model_and_extract_softmaxes(test_loader, "TEST", device, num_epochs, seed)
 

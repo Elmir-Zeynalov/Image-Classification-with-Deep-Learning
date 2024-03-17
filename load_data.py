@@ -382,12 +382,14 @@ def feature_map_statistics(test_dataloader, device, epoch, seed):
     model = load_presaved_model(device, seed, epoch-1)
     analyze_feature_maps(model, test_dataloader, device, num_samples=200)
 
-'''
-This function creates 2 directories, Best_10 and Worst_10
-Under each directory thare are subdirectories representing 3 classes. 
-Images for the best and worst are then copied over to this local directory
-'''
+
 def copy_images(image_paths, directory_name, classes=['buildings', 'forest', 'glacier']):
+    '''
+    This function creates 2 directories, Best_10 and Worst_10
+    Under each directory thare are subdirectories representing 3 classes. 
+    Images for the best and worst are then copied over to this local directory
+    '''
+
     current_directory = os.getcwd()
     save_folder_path = os.path.join(current_directory, directory_name)
     create_folder(save_folder_path)
@@ -397,7 +399,6 @@ def copy_images(image_paths, directory_name, classes=['buildings', 'forest', 'gl
         create_folder(class_path)
         for img in paths:
             shutil.copy(img, class_path)
-
 
 def find_best_and_worst_from_softmaxes(softmaxes, image_paths):
     best = [[] for _ in range(6)]
@@ -418,7 +419,7 @@ def find_best_and_worst_from_softmaxes(softmaxes, image_paths):
 
     return best, worst
 
-def evaluate_model_on_testset(model, dataloader):
+def evaluate_model_on_testset(model, dataloader, saveImages=False):
     total_loss       = 0 
     correct          = 0 
     confusion_matrix = np.zeros(shape=(6,6))
@@ -448,10 +449,11 @@ def evaluate_model_on_testset(model, dataloader):
         image_paths.extend(path)
 
     confusion_matrix = confusion_matrix / len(dataloader.dataset)
-    top_10, worst_10 = find_best_and_worst_from_softmaxes(softmax_scores, image_paths)
 
-    copy_images(top_10, 'Best_10')
-    copy_images(worst_10, 'Worst_10')
+    if saveImages:
+        top_10, worst_10 = find_best_and_worst_from_softmaxes(softmax_scores, image_paths)
+        copy_images(top_10, 'Best_10')
+        copy_images(worst_10, 'Worst_10')
 
     return confusion_matrix, predicted, true_values, softmax_scores
 
@@ -466,9 +468,29 @@ Write code to load the test set, predict on the test set, and then compare
 these against your saved softmax scores. There can be some tolerance between
 the two. Please use relative paths from the main Python files for loading the
 scores, model, etc. Only use an absolute path for the dataset root.
-
-
 '''
+
+def check_model_and_compare_with_saved_softmax(model_path, root_path, seed, saved_softmax_path, tolerance):
+    # Define ANSI escape code for red color
+    RED = '\033[91m'
+    # Define ANSI escape code to reset color
+    RESET = '\033[0m'
+
+    transform = transforms.Compose([
+        transforms.Resize(224),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+
+    test_dataset = ImageDataset(root_dir=root_path, dataset="test", transform=transform)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=16, shuffle=True, num_workers=2)
+
+    model = load_presaved_model(device, seed, num_epochs-1, model_path)
+    _, _, _, softmax_scores = evaluate_model_on_testset(model, test_loader, saveImages=False)
+    
+
+
 
 
 
@@ -484,7 +506,7 @@ def test_model_and_extract_softmaxes(dataloader, type, device, num_epochs,seed):
 
     print(f'Running {type} set...')
     model = load_presaved_model(device, seed, num_epochs-1)
-    confusion_matrix[:,:, 0], predicted[0], true_values[0], softmax_scores = evaluate_model_on_testset(model, dataloader)
+    confusion_matrix[:,:, 0], predicted[0], true_values[0], softmax_scores = evaluate_model_on_testset(model, dataloader, saveImages=True)
     np.save("softmax_scores.npy", np.array(softmax_scores))
 
     accuracies_averages, accuracies = accuracies_for_all_epochs(confusion_matrix, [0,1,2,3,4,5])
@@ -500,7 +522,6 @@ def test_model_and_extract_softmaxes(dataloader, type, device, num_epochs,seed):
     print(f'-> {RED}Avg Accuracy: {np.mean(accuracies_averages)*100:.01f}%{RESET}')
     print(f'-> {RED}mAP: {np.mean(mAPs)*100:.01f}%{RESET}')
     print("***********************************************************")
-
 
 
 if __name__ == "__main__":
@@ -544,6 +565,8 @@ if __name__ == "__main__":
     #perform_pca_2(device, seed, num_epochs, val_dataset, "test_pca_epochs.png")
     print("PCA done")
 
-    
     test_model_and_extract_softmaxes(test_loader, "TEST", device, num_epochs, seed)
+    # /itf-fi-ml/home/elmirz/IN3310/Mandatory_1/SavedModels/model_checkpoint_epoch_19.pth
+    print("CHECKKK")
+    check_model_and_compare_with_saved_softmax('/itf-fi-ml/home/elmirz/IN3310/Mandatory_1/SavedModels/model_checkpoint_epoch_19.pth', 'rr', seed, 'hkjhkj', 0.0001)
 

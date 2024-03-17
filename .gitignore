@@ -7,3 +7,5 @@ validation_set.txt
 Images/
 SavedModels/
 __pycache__/
+Best_10/
+Worst_10/

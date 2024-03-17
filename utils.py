@@ -105,16 +105,18 @@ def load_untrained_model(device,seed):
 
     return model
 
-def load_presaved_model(device, seed, epoch):
+def load_presaved_model(device, seed, epoch, load_path=None):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
     last_epoch = epoch # last epoch
-    curr_dir = os.getcwd()
-    load_path = f'{curr_dir}/SavedModels/model_checkpoint_epoch_{last_epoch}.pth'
-    print("Lpath>", load_path)
+
+    if load_path is None:
+        curr_dir = os.getcwd()
+        load_path = f'{curr_dir}/SavedModels/model_checkpoint_epoch_{last_epoch}.pth'
+
     model = load_model(load_path)
-    print(f'loading: {load_path}')
+    print(f'loaded: {load_path}')
     print('\033[92mModel load successful!\033[0m')
     model = model.to(device)
-    return model#, criterion, optimizer
+    return model

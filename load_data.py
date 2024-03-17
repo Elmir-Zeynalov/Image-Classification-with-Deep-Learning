@@ -384,6 +384,25 @@ def feature_map_statistics(test_dataloader, device, epoch, seed):
 
 
 
+def find_best_and_worst_from_softmaxes(softmaxes, image_paths):
+    best = [[] for _ in range(6)]
+    worst = [[] for _ in range(6)]
+ 
+    for class_id in range(6):
+        class_scores = np.array([score[class_id] for score in softmaxes])
+  
+        top_indices = np.argsort(class_scores)[-10:][::-1].astype(int) 
+        bottom_indices = np.argsort(class_scores)[:10].astype(int)
+
+        best[class_id] = [image_paths[i] for i in top_indices]
+        worst[class_id] = [image_paths[i] for i in bottom_indices]
+
+    #choose the first 3 classes
+    best = best[:3]
+    worst = worst[:3]
+
+    return best, worst
+
 def evaluate_model_on_testset(model, dataloader):
     total_loss       = 0 
     correct          = 0 
@@ -405,10 +424,6 @@ def evaluate_model_on_testset(model, dataloader):
         with torch.no_grad():
             output = model(data)
             softmax_output = F.softmax(output, dim=1)
-            print("Batch id:", batch_idx)
-            print(softmax_output.cpu().numpy())
-            print(path)
-            print()
 
         predicted_label  = output.max(1, keepdim=True)[1][:,0]
         confusion_matrix += metrics.confusion_matrix(target.cpu().numpy(), predicted_label.cpu().numpy(), labels=labels_list)
@@ -418,8 +433,9 @@ def evaluate_model_on_testset(model, dataloader):
         image_paths.extend(path)
 
     confusion_matrix = confusion_matrix / len(dataloader.dataset)
-    #for i in range(len(softmax_scores)):
-        #print(softmax_scores[i])
+    top_10, worst_10 = find_best_and_worst_from_softmaxes(softmax_scores, image_paths)
+
+
     return confusion_matrix, predicted, true_values, softmax_scores
 
 

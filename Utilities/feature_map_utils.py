@@ -1,6 +1,7 @@
 import torch
 import torchvision.models as models 
 import matplotlib.pyplot as plt
+from .utils import load_presaved_model
 
 # storing feature hooks
 class FeatureHook:
@@ -16,67 +17,6 @@ class FeatureHook:
         self.feature_maps.append(output)
         self.batch_indices.append(module.batchindex)
 
-
-#
-#def analyze_feature_maps(model, dataloader, device, num_samples=200):
-#    model.eval()
-#    print("Analyzing feature maps!")
-#    #target_layers = ['conv1', 'layer1.0.conv1', 'layer2.0.conv1' , 'layer3.0.conv1', 'layer4']
-#    
-#    ##BEST SO FAR 50.14
-#    target_layers = ['conv1', 'layer2.0.conv1', 'layer3.0.conv1', 'layer4.0.conv1', 'avgpool']
-#    
-#    # 64.88%
-#    #target_layers = ['conv1', 'layer1.0.conv1', 'layer2.1.conv1', 'layer3.2.conv1', 'layer4.1.conv1']
-#
-#    # 61.13%
-#    #target_layers = ['conv1', 'layer1.2.conv1', 'layer2.3.conv1', 'layer3.4.conv1', 'layer4.0.conv1']
-#
-#    # 66.65 %
-#    #target_layers = ['conv1', 'layer1.0.conv1', 'layer2.0.conv1', 'layer3.0.conv1', 'layer4.0.conv1']
-#
-#    #target_layers = ['conv1', 'layer2.1.conv1', 'layer3.3.conv1', 'layer4.2.conv1', 'fc']
-#    #target_layers = ['conv1', 'layer1.0.conv1', 'layer2.0.conv1', 'layer3.0.conv1', 'layer4.0.conv1']
-#
-#    hook_objects = [FeatureHook(name) for name in target_layers]
-#
-#
-#    for hook_id, (name, mod) in enumerate(model.named_modules()):
-#        if name in target_layers:
-#            mod.register_forward_hook(hook_objects[target_layers.index(name)].hook_fn)
-#
-#
-#    samples_analyzed = 0
-#
-#    with torch.no_grad():
-#        for batch_idx, data_batch in enumerate(dataloader):
-#            data = data_batch['image'].to('cuda') # send data to GPU
-#            target = data_batch['label'].to('cuda') # send data to GPU
-#
-#            output = model(data)
-#
-#            samples_analyzed += data.size(0)
-#            if samples_analyzed >= num_samples:
-#                break
-#
-#    average_percentage = []
-#
-#
-#    for hook_obj in hook_objects:
-#        for feature_map in hook_obj.feature_maps:
-#            non_positive_percentage = (feature_map <= 0).float().mean().item()
-#            average_percentage.append(non_positive_percentage)
-#
-#    final_average_percentage = sum(average_percentage) / len(average_percentage)
-#    print(average_percentage)
-#    print(f'Average Percentage of Non-Positive Values: {final_average_percentage * 100:.2f}%')
-#
-#    for hook_obj in hook_objects:
-#        hook_obj.feature_maps = []
-#
-#
-#
-
 class FeatureHook:
     def __init__(self, name):
         self.name = name
@@ -87,11 +27,21 @@ class FeatureHook:
         self.feature_maps.append(output)
         self.batch_indices.append(module.batchindex)
 
+def feature_map_statistics(test_dataloader, device, epoch, seed):
+    model = load_presaved_model(device, seed, epoch-1)
+    analyze_feature_maps(model, test_dataloader, device, num_samples=200)
 
 def analyze_feature_maps(model, dataloader, device, num_samples=200):
+    # Define ANSI escape code for red color
+    RED = '\033[91m'
+    # Define ANSI escape code to reset color
+    RESET = '\033[0m'
+
     model.eval()
-    print("Analyzing feature maps!")
+    print("\n\t\tAnalyzing feature maps!")
+    print("*******************************************************************************")
     target_layers = ['conv1', 'layer2.0.conv1', 'layer3.0.conv1', 'layer4.0.conv1', 'avgpool']
+    print("Layers - ", target_layers)
 
     hook_objects = [FeatureHook(name) for name in target_layers]
     samples_analyzed = 0
@@ -112,9 +62,9 @@ def analyze_feature_maps(model, dataloader, device, num_samples=200):
         # Forward pass through the model
         with torch.no_grad():
             output = model(data)
-            print(target)
-            print(output.max(1, keepdim=True)[1][:,0])
-            print()
+            #print(target)
+            #print(output.max(1, keepdim=True)[1][:,0])
+            #print()
 
  
         samples_analyzed += data.size(0)
@@ -132,7 +82,10 @@ def analyze_feature_maps(model, dataloader, device, num_samples=200):
     if average_percentage:  # Check if the list is not empty
         final_average_percentage = sum(average_percentage) / len(average_percentage)
         #print(average_percentage)
-        print(f'Average Percentage of Non-Positive Values: {final_average_percentage * 100:.2f}%')
+        print(f'->{RED}Average Percentage of Non-Positive Values: {final_average_percentage * 100:.2f}%{RESET}')
+
+        print("*******************************************************************************")
+        print()
     else:
         print("No feature maps were collected.")
 

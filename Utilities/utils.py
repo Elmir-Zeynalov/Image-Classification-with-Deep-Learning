@@ -72,6 +72,12 @@ def NN_models(model, model_index, num_classes=6):
     return models[model_index]
 
 
+def create_dir(dir_name):
+    current_directory = os.getcwd()
+    save_folder_path = os.path.join(current_directory, dir_name)
+    create_folder(save_folder_path)
+    return save_folder_path
+
 def create_folder(folder_path):
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
@@ -92,6 +98,9 @@ def create_resnet50_model(device, seed):
     model = model.to(device)  # Move the model to GPU or CPU
 
     criterion = torch.nn.CrossEntropyLoss()
+    # criterion = torch.nn.MSELoss()
+    # criterion = torch.nn.L1Loss()
+
     optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.001)
     return model, optimizer, criterion
 
@@ -105,24 +114,18 @@ def load_untrained_model(device,seed):
 
     return model
 
-def load_presaved_model(device, seed, epoch):
+def load_presaved_model(device, seed, epoch, load_path=None):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
-    #model = models.resnet50(pretrained=True)
-    #num_classes = 6
-    #model.fc = NN_models(model, 3)
-    #model = model.to(device)  # Move the model to GPU or CPU
-
-    #criterion = torch.nn.CrossEntropyLoss()
-    #optimizer = torch.optim.SGD(model.parameters(), lr=0.0001, momentum=0.9, weight_decay=0.001)
-    
     last_epoch = epoch # last epoch
-    curr_dir = os.getcwd()
-    load_path = f'{curr_dir}/SavedModels/model_checkpoint_epoch_{last_epoch}.pth'
-    print("Lpath>", load_path)
+
+    if load_path is None:
+        curr_dir = os.getcwd()
+        load_path = f'{curr_dir}/SavedModels/model_checkpoint_epoch_{last_epoch}.pth'
+
     model = load_model(load_path)
-    print(f'loading: {load_path}')
+    print(f'loaded: {load_path}')
     print('\033[92mModel load successful!\033[0m')
     model = model.to(device)
-    return model#, criterion, optimizer
+    return model

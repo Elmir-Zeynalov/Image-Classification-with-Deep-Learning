@@ -1,6 +1,7 @@
 import torch
 import torchvision.models as models 
 import matplotlib.pyplot as plt
+from .utils import load_presaved_model
 
 # storing feature hooks
 class FeatureHook:
@@ -26,11 +27,21 @@ class FeatureHook:
         self.feature_maps.append(output)
         self.batch_indices.append(module.batchindex)
 
+def feature_map_statistics(test_dataloader, device, epoch, seed):
+    model = load_presaved_model(device, seed, epoch-1)
+    analyze_feature_maps(model, test_dataloader, device, num_samples=200)
 
 def analyze_feature_maps(model, dataloader, device, num_samples=200):
+    # Define ANSI escape code for red color
+    RED = '\033[91m'
+    # Define ANSI escape code to reset color
+    RESET = '\033[0m'
+
     model.eval()
-    print("Analyzing feature maps!")
+    print("\n\t\tAnalyzing feature maps!")
+    print("*******************************************************************************")
     target_layers = ['conv1', 'layer2.0.conv1', 'layer3.0.conv1', 'layer4.0.conv1', 'avgpool']
+    print("Layers - ", target_layers)
 
     hook_objects = [FeatureHook(name) for name in target_layers]
     samples_analyzed = 0
@@ -51,9 +62,9 @@ def analyze_feature_maps(model, dataloader, device, num_samples=200):
         # Forward pass through the model
         with torch.no_grad():
             output = model(data)
-            print(target)
-            print(output.max(1, keepdim=True)[1][:,0])
-            print()
+            #print(target)
+            #print(output.max(1, keepdim=True)[1][:,0])
+            #print()
 
  
         samples_analyzed += data.size(0)
@@ -71,7 +82,10 @@ def analyze_feature_maps(model, dataloader, device, num_samples=200):
     if average_percentage:  # Check if the list is not empty
         final_average_percentage = sum(average_percentage) / len(average_percentage)
         #print(average_percentage)
-        print(f'Average Percentage of Non-Positive Values: {final_average_percentage * 100:.2f}%')
+        print(f'->{RED}Average Percentage of Non-Positive Values: {final_average_percentage * 100:.2f}%{RESET}')
+
+        print("*******************************************************************************")
+        print()
     else:
         print("No feature maps were collected.")
 

@@ -72,6 +72,12 @@ def NN_models(model, model_index, num_classes=6):
     return models[model_index]
 
 
+def create_dir(dir_name):
+    current_directory = os.getcwd()
+    save_folder_path = os.path.join(current_directory, dir_name)
+    create_folder(save_folder_path)
+    return save_folder_path
+
 def create_folder(folder_path):
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
@@ -92,6 +98,9 @@ def create_resnet50_model(device, seed):
     model = model.to(device)  # Move the model to GPU or CPU
 
     criterion = torch.nn.CrossEntropyLoss()
+    # criterion = torch.nn.MSELoss()
+    # criterion = torch.nn.L1Loss()
+
     optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.001)
     return model, optimizer, criterion
 

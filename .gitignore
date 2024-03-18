@@ -2,10 +2,9 @@
 test_set.txt
 train_set.txt
 validation_set.txt
-
+SavedModels/model_checkpoint_epoch_29
 #Ignoring the images Data
 Images/
-SavedModels/
 __pycache__/
 Best_10/
 Worst_10/

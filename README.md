@@ -1,29 +1,23 @@
-# Project Name
+# ResNet50 Image Classification and Analysis
 
-A brief description of your project.
-
-## Table of Contents
-
-- [Introduction](#introduction)
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
-
-## Introduction
-
-Provide a short introduction to your project. Explain what it does and why it's useful.
+This project involves training a ResNet50 model for image classification, analyzing feature maps, and performing Principal Component Analysis (PCA) on feature representations. It is structured around loading and preprocessing image datasets, training the model, evaluating its performance, and conducting further analysis on the feature maps and PCA results.
 
 ## Features
 
-List the key features of your project.
+### Dataset Management
+- Images are loaded and split into training, validation, and test datasets.
+- Data is augmented using transformations to improve model robustness.
 
-## Installation
+### Model Training
+- A ResNet50 model is trained on the preprocessed dataset.
+- The model's performance is tracked over multiple epochs.
 
-Provide instructions on how to install your project. Include any dependencies and how to install them.
+### Evaluation and Softmax Comparison
+- The trained model is evaluated on the test dataset.
+- Predictions are compared with previously saved softmax outputs for consistency.
 
-```bash
-# Example installation command
-npm install
+### Feature Map Analysis
+- Feature map statistics are computed to understand the internal representations of the model.
+
+### Principal Component Analysis
+- PCA is applied to the model's feature representations for dimensionality reduction and visualization.
